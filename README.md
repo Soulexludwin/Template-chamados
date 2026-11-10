@@ -1,169 +1,205 @@
-🖥️ Sistema de Chamados de TI (Local)
+# 🖥️ Sistema de Chamados de TI (Local)
 
-Aplicação web enxuta e de alta performance, desenvolvida para a gestão de chamados internos de TI em redes locais.
+Aplicação web leve e eficiente para gestão de chamados internos de TI em redes locais.
 
-O projeto utiliza SQLite embarcado, dispensando a instalação de servidores de banco de dados pesados, e possui notificações nativas integradas ao Windows.
+O projeto utiliza SQLite embarcado, dispensando a instalação de um servidor de banco de dados pesado, e conta com notificações nativas integradas ao Windows.
 
-Os scripts de instalação e inicialização automatizados (.bat) detectam dinamicamente o diretório do projeto, ajustando nomes de processos e atalhos de acordo com a pasta escolhida pelo usuário.
+Os scripts de instalação e inicialização automatizados (`.bat`) detectam dinamicamente o diretório do projeto e ajustam nomes de processos e atalhos conforme a pasta escolhida pelo usuário.
 
-🚀 Tecnologias Utilizadas
-Backend: Node.js, Fastify, TypeScript.
-Banco de Dados: SQLite (via better-sqlite3 e Drizzle ORM).
-Notificações: node-notifier (alertas nativos do Windows).
-Frontend: HTML5, JavaScript moderno (ES6+) e Tailwind CSS (via CDN).
-Automação: Windows Batch Scripts (.bat).
-✨ Funcionalidades
-👤 Visão do Solicitante
+## 🚀 Tecnologias utilizadas
 
-Identificação automática da máquina (clientId via localStorage). O usuário visualiza apenas os chamados abertos pelo seu próprio navegador.
+- Backend: Node.js + Fastify + TypeScript
+- Banco de dados: SQLite com `better-sqlite3` e Drizzle ORM
+- Notificações: `node-notifier` (alertas nativos do Windows)
+- Frontend: HTML5, JavaScript moderno (ES6+) e Tailwind CSS via CDN
+- Automação: scripts Windows Batch (`.bat`)
 
-🛠️ Painel do Técnico (/tecnico)
+## ✨ Funcionalidades
 
-Área administrativa protegida por senha, destinada à equipe de TI, permitindo visualizar a fila global de chamados, gerenciar solicitações e alterar seus respectivos status.
+### 👤 Visão do solicitante
+Identificação automática da máquina via `clientId` no `localStorage`. O usuário visualiza apenas os chamados abertos pelo seu próprio navegador.
 
-🔔 Alertas Nativos no Host
+### 🛠️ Painel do técnico (`/tecnico`)
+Área administrativa protegida por senha, destinada à equipe de TI. Permite visualizar a fila global de chamados, gerenciar solicitações e alterar o status de cada uma.
 
+### 🔔 Alertas nativos no host
 Emissão de avisos visuais e sonoros no centro de notificações do Windows sempre que um chamado é registrado.
 
-⚙️ Instalação Dinâmica
+### ⚙️ Instalação dinâmica
+Script `.bat` que baixa as dependências, compila binários C++ e gera o script de inicialização adaptado ao nome da pasta atual do projeto.
 
-Script .bat que baixa as dependências, compila binários C++ e gera o script de inicialização adaptado ao nome da pasta atual do projeto.
+---
 
-🛠️ Pré-requisitos
+## 🛠️ Pré-requisitos
 
 Antes de instalar, certifique-se de que a máquina host possui:
 
-Node.js: versão 18 ou superior.
-Sistema Operacional: Windows 10 ou Windows 11 (necessário para suporte às notificações nativas e aos scripts .bat).
-📦 Instalação
-1. Clonar ou baixar o repositório
-bash
-git clone https://github.com/SEU_USUARIO/NOME_DO_REPOSITORIO.git
+- Node.js 18 ou superior
+- Windows 10 ou Windows 11
+- Permissão para executar scripts do PowerShell e arquivos `.bat`
 
-2. Executar a instalação automatizada
+> O suporte a notificações nativas e scripts automáticos depende do sistema operacional Windows.
+
+---
+
+## 📦 Instalação
+
+### 1) Clonar ou baixar o repositório
+
+```bash
+git clone https://github.com/Soulexludwin/Template-chamados
+cd CDST
+```
+
+### 2) Executar a instalação automatizada
 
 Navegue até a pasta do projeto e dê um duplo clique no arquivo:
 
-text
+```bat
 instalar.bat
+```
 
+O script realizará automaticamente:
 
-O script realizará automaticamente as seguintes tarefas:
+- Download dos pacotes NPM
+- Aprovação dos binários nativos do `better-sqlite3`
+- Criação e aplicação do esquema do banco SQLite
+- Geração do arquivo de execução `iniciar_servidor.bat`
 
-Download dos pacotes NPM.
-Aprovação dos binários nativos do better-sqlite3.
-Aplicação do esquema no banco de dados SQLite.
-Geração do arquivo de execução iniciar_servidor.bat.
-3. Iniciar a aplicação
+### 3) Iniciar a aplicação
 
 Após a instalação, dê um duplo clique no arquivo gerado:
 
-text
+```bat
 iniciar_servidor.bat
+```
 
-4. Acessar o sistema
+### 4) Acessar o sistema
 
-Com o servidor iniciado, acesse pelo navegador:
+Após o servidor iniciar, acesse no navegador:
 
-Acesso	Endereço
-Solicitantes (Local)	http://localhost:3000
-Solicitantes (Rede)	http://IP_DA_MAQUINA:3000
-Painel do Técnico	http://localhost:3000/tecnico
+| Tipo de acesso | Endereço |
+|---|---|
+| Solicitantes (Local) | http://localhost:3000 |
+| Solicitantes (Rede) | http://IP_DA_MAQUINA:3000 |
+| Painel do Técnico | http://localhost:3000/tecnico |
 
-Senha padrão do painel técnico: admin123
+Senha padrão do painel técnico:
 
-⚠️ Atenção: Recomenda-se alterar a senha padrão antes de disponibilizar o sistema na rede.
-🔍 Troubleshooting (Resolução de Problemas)
-1. Erro de política de execução no PowerShell (ExecutionPolicy)
+```text
+admin123
+```
 
-Sintoma: Mensagem de erro informando que a execução de scripts foi desabilitada no sistema ao executar comandos NPM.
+> Recomendado alterar a senha padrão antes de disponibilizar o sistema na rede.
+
+---
+
+## 🔍 Troubleshooting
+
+### 1) Erro de política de execução no PowerShell
+
+Sintoma: mensagem informando que a execução de scripts foi desabilitada ao executar comandos NPM.
 
 Solução:
 
-Abra o PowerShell como Administrador e execute:
-
-powershell
+```powershell
 Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
+```
 
-2. Notificações do Windows não aparecem no Host
+---
 
-Sintoma: O chamado é cadastrado, mas nenhum alerta sonoro ou pop-up aparece no canto da tela.
+### 2) Notificações do Windows não aparecem no host
+
+Sintoma: o chamado é cadastrado, mas nenhum aviso sonoro ou pop-up aparece.
 
 Possíveis soluções:
 
-Certifique-se de que o Assistente de Foco / Não Perturbe do Windows está desativado (Win + A).
-Acesse Configurações > Sistema > Notificações e verifique se a opção "Obter notificações de aplicativos" está ativada.
-Verifique se as notificações não estão acumuladas dentro da Central de Ações, ao lado do relógio do Windows.
-3. Erro SQLite_ERROR: no such table: chamados
+- Verifique se o Assistente de Foco / Não Perturbe do Windows está desativado (`Win + A`)
+- Acesse Configurações > Sistema > Notificações e confirme que a opção "Obter notificações de aplicativos" está ativada
+- Verifique se as notificações não estão acumuladas na Central de Ações
 
-Sintoma: Ao acessar o sistema, a tela exibe um erro informando que a tabela chamados não existe.
+---
+
+### 3) Erro `SQLite_ERROR: no such table: chamados`
+
+Sintoma: a tela exibe um erro informando que a tabela `chamados` não existe.
 
 Solução:
 
-Feche a aplicação e execute a sincronização manual do banco de dados pelo terminal, na pasta do projeto:
-
-bash
+```bash
 npx drizzle-kit push
+```
 
-4. Conflito de Porta (Port 3000 already in use)
+---
 
-Sintoma: O servidor falha ao iniciar, informando o erro:
+### 4) Conflito de porta (`Port 3000 already in use`)
 
-text
+Sintoma: o servidor falha ao iniciar com:
+
+```text
 EADDRINUSE: address already in use :::3000
+```
 
+Causa: outra aplicação ou uma instância anterior do Node.js está ocupando a porta 3000.
 
-Causa: Outra aplicação ou uma instância anterior do Node.js está ocupando a porta 3000.
+#### Opção 1: encerrar todas as instâncias do Node.js
 
-Solução 1 – Finalizar todas as instâncias do Node.js:
-
-Execute no terminal do Windows:
-
-dos
+```bat
 taskkill /f /im node.exe
+```
 
+#### Opção 2: alterar a porta do sistema
 
-Solução 2 – Alterar a porta do sistema:
+Edite o arquivo:
 
-Caso prefira utilizar outra porta, edite o arquivo:
-
-text
+```text
 src/server.ts
+```
 
+E altere:
 
-Altere a configuração:
-
-typescript
+```typescript
 port: 3000
+```
 
+para, por exemplo:
 
-Para a porta desejada, por exemplo:
-
-typescript
+```typescript
 port: 8080
+```
 
-5. Falha de scripts bloqueados (npm install-scripts)
+---
 
-Sintoma: Erro de compilação relacionado ao better-sqlite3 ou esbuild após executar o npm install.
+### 5) Falha de scripts bloqueados (`npm install-scripts`)
+
+Sintoma: erro de compilação relacionado ao `better-sqlite3` ou ao `esbuild` após executar `npm install`.
 
 Solução:
 
-Execute a liberação manual dos scripts nativos utilizando os comandos:
-
-bash
+```bash
 npm install-scripts approve better-sqlite3 esbuild
 npm rebuild
+```
 
-6. Senha invalida
+---
 
-A senha padrão desse template é admin123
+### 6) Senha inválida
 
-mas ela pode ser alterada com o arquivo de redefinir senha na pasta, ele é acessivel somente ao pc do host, então tome cuidado.
+A senha padrão desse template é:
 
-📌 Observações
-O sistema foi desenvolvido para funcionar em redes locais.
-O banco de dados SQLite é armazenado localmente, dispensando a necessidade de um servidor de banco de dados externo.
-As notificações nativas dependem das configurações do Windows na máquina host.
-A instalação e inicialização são automatizadas por scripts .bat.
+```text
+admin123
+```
+
+Ela pode ser alterada por meio do arquivo de redefinição de senha na pasta do sistema, acessível apenas no computador do host. Tome cuidado com esse acesso.
+
+---
+
+## 📌 Observações
+
+- O sistema foi desenvolvido para funcionar em redes locais
+- O banco de dados SQLite é armazenado localmente, sem necessidade de um servidor externo
+- As notificações nativas dependem das configurações do Windows na máquina host
+- A instalação e a inicialização são automatizadas por scripts `.bat`
 
 Desenvolvido para facilitar e centralizar o atendimento interno de TI. 🖥️
