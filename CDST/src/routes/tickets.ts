@@ -1,10 +1,25 @@
 import { FastifyInstance } from "fastify";
 import { eq } from "drizzle-orm";
+import fs from "fs";
+import path from "path";
 import { db } from "../db/index.js";
 import { chamados } from "../db/schema.js";
 import { notificarNovoChamado } from "../services/notifier.js";
 
-const SENHA_TECNICO = "admin123";
+// Função para obter a senha atualizada do config.json
+function obterSenhaTecnico(): string {
+  try {
+    const configPath = path.join(process.cwd(), "config.json");
+    if (fs.existsSync(configPath)) {
+      const content = fs.readFileSync(configPath, "utf-8");
+      const data = JSON.parse(content);
+      return data.senhaTecnico || "admin123";
+    }
+  } catch (err) {
+    console.error("Erro ao ler config.json, utilizando senha padrao:", err);
+  }
+  return "admin123";
+}
 
 interface CriarChamadoBody {
   clientId: string;
@@ -15,7 +30,7 @@ interface CriarChamadoBody {
 }
 
 export async function ticketRoutes(fastify: FastifyInstance) {
-  // Chamados da própria máquina
+  // 1. Rota pública: Solicitante consulta APENAS chamados da própria máquina (Sem botões de alteração)
   fastify.get<{ Querystring: { clientId?: string } }>("/chamados/meus", async (request, reply) => {
     const { clientId } = request.query;
     if (!clientId) {
@@ -24,16 +39,16 @@ export async function ticketRoutes(fastify: FastifyInstance) {
     return await db.select().from(chamados).where(eq(chamados.clientId, clientId));
   });
 
-  // Todos os chamados (Admin / Técnico)
+  // 2. Rota restrita (Técnico): Consulta a lista global de todos os chamados
   fastify.get<{ Headers: { "x-tech-password"?: string } }>("/admin/chamados", async (request, reply) => {
     const senha = request.headers["x-tech-password"];
-    if (senha !== SENHA_TECNICO) {
-      return reply.status(401).send({ error: "Senha inválida." });
+    if (senha !== obterSenhaTecnico()) {
+      return reply.status(401).send({ error: "Senha do modo técnico inválida." });
     }
     return await db.select().from(chamados);
   });
 
-  // Criar chamado gravando o clientId
+  // 3. Rota pública: Criar novo chamado
   fastify.post<{ Body: CriarChamadoBody }>("/chamados", async (request, reply) => {
     const { clientId, solicitante, titulo, descricao, prioridade } = request.body;
 
@@ -48,19 +63,19 @@ export async function ticketRoutes(fastify: FastifyInstance) {
     try {
       notificarNovoChamado(chamadoCriado);
     } catch (e) {
-      console.error("Erro na notificação:", e);
+      console.error("Erro ao disparar notificação:", e);
     }
 
     return reply.status(201).send(chamadoCriado);
   });
 
-  // Alterar Status
+  // 4. Rota RESTRICTA de alteração de status: Exige senha de técnico válida
   fastify.patch<{ Params: { id: string }; Body: { status: "Aberto" | "Em Atendimento" | "Concluído" }; Headers: { "x-tech-password"?: string } }>(
     "/admin/chamados/:id/status",
     async (request, reply) => {
       const senha = request.headers["x-tech-password"];
-      if (senha !== SENHA_TECNICO) {
-        return reply.status(401).send({ error: "Acesso negado." });
+      if (senha !== obterSenhaTecnico()) {
+        return reply.status(401).send({ error: "Permissão negada. Apenas técnicos podem alterar o status do chamado." });
       }
 
       const ticketId = Number(request.params.id);
