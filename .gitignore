@@ -1,0 +1,6 @@
+node_modules/
+chamados.sqlite
+chamados.sqlite-journal
+drizzle/
+.env
+*.log
