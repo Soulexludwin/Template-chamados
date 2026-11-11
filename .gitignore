@@ -1,6 +1,6 @@
 node_modules/
+cert/
 chamados.sqlite
-chamados.sqlite-journal
-drizzle/
-.env
-*.log
+config.json
+.DS_Store
+dist/
