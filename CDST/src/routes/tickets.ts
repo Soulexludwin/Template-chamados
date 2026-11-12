@@ -1,93 +1,286 @@
-import { FastifyInstance } from "fastify";
-import { eq } from "drizzle-orm";
+import { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
+import { eq, desc, asc, sql } from "drizzle-orm";
 import fs from "fs";
 import path from "path";
+import { pipeline } from "stream/promises";
+import { randomUUID, createHash } from "crypto";
 import { db } from "../db/index.js";
-import { chamados } from "../db/schema.js";
-import { notificarNovoChamado } from "../services/notifier.js";
+import { chamados, mensagens } from "../db/schema.js";
 
-// Função para obter a senha atualizada do config.json
-function obterSenhaTecnico(): string {
+const uploadDir = path.join(process.cwd(), "uploads");
+const configPath = path.join(process.cwd(), "config.json");
+
+function obterSenhaConfig(): string {
   try {
-    const configPath = path.join(process.cwd(), "config.json");
     if (fs.existsSync(configPath)) {
-      const content = fs.readFileSync(configPath, "utf-8");
-      const data = JSON.parse(content);
-      return data.senhaTecnico || "admin123";
+      const raw = fs.readFileSync(configPath, "utf-8").replace(/^\uFEFF/, "").trim();
+      const parsed = JSON.parse(raw);
+
+      const candidatos = [
+        parsed.senhaTecnico,
+        parsed.senha_tecnico,
+        parsed.techPassword,
+        parsed.tech_password,
+        parsed.adminPassword,
+        parsed.admin_password,
+        parsed.password,
+        parsed.senha,
+      ];
+
+      for (const val of candidatos) {
+        if (typeof val === "string" && val.trim() !== "") {
+          return val.trim();
+        }
+      }
+
+      // Fallback: pega a primeira string definida no config.json
+      const primeiraString = Object.values(parsed).find(
+        (v): v is string => typeof v === "string" && v.trim() !== ""
+      );
+      if (primeiraString) return primeiraString.trim();
     }
   } catch (err) {
-    console.error("Erro ao ler config.json, utilizando senha padrao:", err);
+    console.error("Erro ao ler config.json:", err);
   }
   return "admin123";
 }
 
-interface CriarChamadoBody {
-  clientId: string;
-  solicitante: string;
-  titulo: string;
-  descricao: string;
-  prioridade?: "Baixa" | "Média" | "Alta";
+function validarTecnico(req: FastifyRequest, reply: FastifyReply): boolean {
+  const senhaRecebida = String(req.headers["x-tech-password"] || "").trim();
+  const senhaConfig = obterSenhaConfig();
+
+  if (!senhaRecebida) {
+    reply.code(401).send({ error: "Senha tÃ©cnica nÃ£o informada." });
+    return false;
+  }
+
+  const hashRecebido = createHash("sha256").update(senhaRecebida).digest("hex");
+  const valida =
+    senhaRecebida === senhaConfig ||
+    hashRecebido.toLowerCase() === senhaConfig.toLowerCase();
+
+  if (!valida) {
+    reply.code(401).send({ error: "Senha tÃ©cnica invÃ¡lida." });
+    return false;
+  }
+  return true;
 }
 
-export async function ticketRoutes(fastify: FastifyInstance) {
-  // 1. Rota pública: Solicitante consulta APENAS chamados da própria máquina (Sem botões de alteração)
-  fastify.get<{ Querystring: { clientId?: string } }>("/chamados/meus", async (request, reply) => {
-    const { clientId } = request.query;
-    if (!clientId) {
-      return reply.status(400).send({ error: "clientId não fornecido." });
+async function garantirEstruturaBanco() {
+  try {
+    await db.run(sql`
+      CREATE TABLE IF NOT EXISTS mensagens (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        chamado_id INTEGER NOT NULL,
+        autor TEXT NOT NULL,
+        texto TEXT,
+        anexo TEXT,
+        criado_em TEXT NOT NULL
+      )
+    `);
+  } catch (err) {
+    console.error("Aviso ao verificar tabela mensagens:", err);
+  }
+
+  try {
+    await db.run(sql`ALTER TABLE chamados ADD COLUMN notas_conclusao TEXT`);
+  } catch {
+    // Coluna jÃ¡ existe
+  }
+
+  try {
+    await db.run(sql`ALTER TABLE chamados ADD COLUMN anexo TEXT`);
+  } catch {
+    // Coluna jÃ¡ existe
+  }
+}
+
+async function processarMultipart(req: FastifyRequest) {
+  const fields: Record<string, string> = {};
+  let anexoUrl: string | null = null;
+
+  if (!req.isMultipart()) {
+    const body = (req.body as Record<string, any>) || {};
+    for (const [k, v] of Object.entries(body)) {
+      if (v !== undefined && v !== null) fields[k] = String(v);
     }
-    return await db.select().from(chamados).where(eq(chamados.clientId, clientId));
+    return { fields, anexoUrl };
+  }
+
+  if (!fs.existsSync(uploadDir)) {
+    fs.mkdirSync(uploadDir, { recursive: true });
+  }
+
+  for await (const part of req.parts()) {
+    if (part.type === "file") {
+      if (part.filename && part.filename.trim() !== "") {
+        const ext = path.extname(part.filename) || ".png";
+        const nomeArquivo = `${Date.now()}-${randomUUID()}${ext}`;
+        const caminhoDestino = path.join(uploadDir, nomeArquivo);
+        await pipeline(part.file, fs.createWriteStream(caminhoDestino));
+        anexoUrl = `/uploads/${nomeArquivo}`;
+      } else {
+        part.file.resume();
+      }
+    } else {
+      fields[part.fieldname] = String(part.value ?? "");
+    }
+  }
+
+  return { fields, anexoUrl };
+}
+
+export async function ticketRoutes(app: FastifyInstance) {
+  await garantirEstruturaBanco();
+
+  // 1. Listar chamados do portal do usuÃ¡rio (filtrados por setor)
+  app.get("/chamados/meus", async (req, reply) => {
+    const query = req.query as { solicitante?: string };
+    const todos = await db.select().from(chamados).orderBy(asc(chamados.id));
+
+    if (query.solicitante && query.solicitante.trim() !== "") {
+      const alvo = query.solicitante.trim().toLowerCase();
+      return todos.filter((c) => c.solicitante.trim().toLowerCase() === alvo);
+    }
+
+    return todos;
   });
 
-  // 2. Rota restrita (Técnico): Consulta a lista global de todos os chamados
-  fastify.get<{ Headers: { "x-tech-password"?: string } }>("/admin/chamados", async (request, reply) => {
-    const senha = request.headers["x-tech-password"];
-    if (senha !== obterSenhaTecnico()) {
-      return reply.status(401).send({ error: "Senha do modo técnico inválida." });
-    }
-    return await db.select().from(chamados);
-  });
-
-  // 3. Rota pública: Criar novo chamado
-  fastify.post<{ Body: CriarChamadoBody }>("/chamados", async (request, reply) => {
-    const { clientId, solicitante, titulo, descricao, prioridade } = request.body;
-
-    const [chamadoCriado] = await db.insert(chamados).values({
-      clientId: clientId || "desconhecido",
-      solicitante,
-      titulo,
-      descricao,
-      prioridade
-    }).returning();
-
+  // 2. Criar novo chamado (com foto/print opcional)
+  app.post("/chamados", async (req, reply) => {
     try {
-      notificarNovoChamado(chamadoCriado);
-    } catch (e) {
-      console.error("Erro ao disparar notificação:", e);
-    }
+      const { fields, anexoUrl } = await processarMultipart(req);
 
-    return reply.status(201).send(chamadoCriado);
-  });
+      const solicitante = (fields.solicitante || "").trim();
+      const titulo = (fields.titulo || "").trim();
+      const descricao = (fields.descricao || "").trim();
+      const prioridade = (fields.prioridade || "MÃ©dia").trim();
+      const clientId = (fields.clientId || solicitante || "local").trim();
 
-  // 4. Rota RESTRICTA de alteração de status: Exige senha de técnico válida
-  fastify.patch<{ Params: { id: string }; Body: { status: "Aberto" | "Em Atendimento" | "Concluído" }; Headers: { "x-tech-password"?: string } }>(
-    "/admin/chamados/:id/status",
-    async (request, reply) => {
-      const senha = request.headers["x-tech-password"];
-      if (senha !== obterSenhaTecnico()) {
-        return reply.status(401).send({ error: "Permissão negada. Apenas técnicos podem alterar o status do chamado." });
+      if (!solicitante || !titulo || !descricao) {
+        return reply.code(400).send({ error: "Setor, tÃ­tulo e descriÃ§Ã£o sÃ£o obrigatÃ³rios." });
       }
 
-      const ticketId = Number(request.params.id);
-      const { status } = request.body;
-
-      const [chamadoAtualizado] = await db
-        .update(chamados)
-        .set({ status })
-        .where(eq(chamados.id, ticketId))
+      const [novoChamado] = await db
+        .insert(chamados)
+        .values({
+          clientId,
+          solicitante,
+          titulo,
+          descricao,
+          prioridade,
+          status: "Aberto",
+          criadoEm: new Date().toISOString(),
+          anexo: anexoUrl,
+        })
         .returning();
 
-      return reply.send(chamadoAtualizado);
+      return reply.code(201).send(novoChamado);
+    } catch (err: any) {
+      req.log.error(err);
+      return reply.code(500).send({
+        error: `Erro interno ao salvar chamado: ${err?.message || "desconhecido"}`,
+      });
     }
-  );
+  });
+
+  // 3. Listar todos os chamados (Painel TÃ©cnico)
+  app.get("/admin/chamados", async (req, reply) => {
+    if (!validarTecnico(req, reply)) return;
+    return await db.select().from(chamados).orderBy(desc(chamados.id));
+  });
+
+  // 4. Alterar status do chamado (Atender / Concluir)
+  const atualizarStatusHandler = async (req: FastifyRequest, reply: FastifyReply) => {
+    if (!validarTecnico(req, reply)) return;
+
+    const params = req.params as { id: string };
+    const idNum = Number(params.id);
+    if (isNaN(idNum)) {
+      return reply.code(400).send({ error: "ID de chamado invÃ¡lido." });
+    }
+
+    const body = (req.body as { status?: string; notasConclusao?: string | null }) || {};
+    const status = (body.status || "").trim();
+
+    if (!status) {
+      return reply.code(400).send({ error: "Novo status Ã© obrigatÃ³rio." });
+    }
+
+    const updateData: { status: string; notasConclusao?: string | null } = { status };
+    if (body.notasConclusao !== undefined) {
+      updateData.notasConclusao = body.notasConclusao;
+    }
+
+    const [atualizado] = await db
+      .update(chamados)
+      .set(updateData)
+      .where(eq(chamados.id, idNum))
+      .returning();
+
+    if (!atualizado) {
+      return reply.code(404).send({ error: "Chamado nÃ£o encontrado." });
+    }
+
+    return atualizado;
+  };
+
+  app.patch("/admin/chamados/:id/status", atualizarStatusHandler);
+  app.put("/admin/chamados/:id/status", atualizarStatusHandler);
+
+  // 5. Listar mensagens do chat de um chamado
+  app.get("/chamados/:id/mensagens", async (req, reply) => {
+    const params = req.params as { id: string };
+    const idNum = Number(params.id);
+    if (isNaN(idNum)) {
+      return reply.code(400).send({ error: "ID de chamado invÃ¡lido." });
+    }
+
+    return await db
+      .select()
+      .from(mensagens)
+      .where(eq(mensagens.chamadoId, idNum))
+      .orderBy(asc(mensagens.id));
+  });
+
+  // 6. Enviar nova mensagem no chat (texto e/ou print)
+  app.post("/chamados/:id/mensagens", async (req, reply) => {
+    try {
+      const params = req.params as { id: string };
+      const idNum = Number(params.id);
+      if (isNaN(idNum)) {
+        return reply.code(400).send({ error: "ID de chamado invÃ¡lido." });
+      }
+
+      const { fields, anexoUrl } = await processarMultipart(req);
+      const autor = (fields.autor || "solicitante").trim();
+      const texto = (fields.texto || "").trim();
+
+      if (autor === "tecnico" && !validarTecnico(req, reply)) {
+        return;
+      }
+
+      if (!texto && !anexoUrl) {
+        return reply.code(400).send({ error: "Envie uma mensagem de texto ou anexe uma imagem." });
+      }
+
+      const [novaMensagem] = await db
+        .insert(mensagens)
+        .values({
+          chamadoId: idNum,
+          autor,
+          texto: texto || null,
+          anexo: anexoUrl,
+          criadoEm: new Date().toISOString(),
+        })
+        .returning();
+
+      return reply.code(201).send(novaMensagem);
+    } catch (err: any) {
+      req.log.error(err);
+      return reply.code(500).send({
+        error: `Erro interno ao enviar mensagem: ${err?.message || "desconhecido"}`,
+      });
+    }
+  });
 }

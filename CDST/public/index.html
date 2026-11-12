@@ -5,7 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Painel de Chamados - Suporte TI</title>
   
-  <!-- Importação da fonte Poppins -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -26,7 +25,7 @@
         <h1 class="text-xl font-bold tracking-wide">Suporte TI</h1>
       </div>
       <div class="flex items-center gap-3">
-        <button id="btnNovoChamado" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium shadow flex items-center gap-2 transition">
+        <button id="btnNovoChamado" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium shadow flex items-center gap-2 transition text-sm">
           <span>+</span> Abrir Chamado
         </button>
         <a href="/tecnico.html" class="bg-purple-900/80 hover:bg-purple-800 text-purple-200 border border-purple-700/50 px-4 py-2 rounded-lg text-sm font-medium transition flex items-center gap-2">
@@ -37,7 +36,7 @@
   </header>
 
   <main class="max-w-7xl mx-auto px-6 py-8">
-    <!-- Indicadores / Cards de Resumo em Verde -->
+    <!-- Indicadores -->
     <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
       <div class="bg-emerald-900/40 border border-emerald-700/50 p-5 rounded-xl shadow-lg flex items-center justify-between backdrop-blur-sm">
         <div>
@@ -65,25 +64,23 @@
     </div>
 
     <!-- Filtros de Status -->
-    <div class="flex gap-2 mb-6 border-b border-indigo-900/60 pb-4">
+    <div class="flex gap-2 mb-6 border-b border-indigo-900/60 pb-4 flex-wrap">
       <button class="filter-btn px-4 py-2 text-sm font-medium rounded-lg bg-blue-600 text-white shadow" data-status="todos">Todos</button>
       <button class="filter-btn px-4 py-2 text-sm font-medium rounded-lg bg-indigo-900/40 text-slate-300 hover:bg-indigo-800/50 border border-indigo-800/40" data-status="Aberto">Abertos</button>
       <button class="filter-btn px-4 py-2 text-sm font-medium rounded-lg bg-indigo-900/40 text-slate-300 hover:bg-indigo-800/50 border border-indigo-800/40" data-status="Em Atendimento">Em Atendimento</button>
       <button class="filter-btn px-4 py-2 text-sm font-medium rounded-lg bg-indigo-900/40 text-slate-300 hover:bg-indigo-800/50 border border-indigo-800/40" data-status="Concluído">Concluídos</button>
     </div>
 
-    <!-- Lista de Chamados -->
-    <div id="listaChamados" class="grid grid-cols-1 gap-4">
-      <!-- Inserido dinamicamente pelo app.js -->
-    </div>
+    <!-- Lista de Solicitações -->
+    <div id="listaChamados" class="grid grid-cols-1 gap-4"></div>
   </main>
 
-  <!-- Modal Formulário -->
+  <!-- Modal Formulário de Abertura -->
   <div id="modalForm" class="fixed inset-0 bg-black/70 hidden items-center justify-center p-4 backdrop-blur-sm z-50">
     <div class="bg-indigo-950 border border-indigo-800/60 rounded-xl shadow-2xl w-full max-w-lg overflow-hidden text-slate-100">
       <div class="bg-indigo-900/80 px-6 py-4 flex justify-between items-center text-white border-b border-indigo-800">
         <h3 class="font-bold text-lg">Fazer um Chamado</h3>
-        <button id="btnFecharModal" class="text-slate-400 hover:text-white">✕</button>
+        <button id="btnFecharModal" type="button" class="text-slate-400 hover:text-white">✕</button>
       </div>
       
       <form id="formChamado" class="p-6 space-y-4">
@@ -99,7 +96,7 @@
 
         <div>
           <label class="block text-sm font-medium text-slate-300 mb-1">Descrição Detalhada</label>
-          <textarea id="descricao" rows="3" required placeholder="Descreva os detalhes..." class="w-full px-3 py-2 bg-indigo-900/30 border border-indigo-700/60 text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 placeholder-slate-500"></textarea>
+          <textarea id="descricao" rows="3" required placeholder="Descreva os detalhes... (Dica: você também pode colar um print com Ctrl+V)" class="w-full px-3 py-2 bg-indigo-900/30 border border-indigo-700/60 text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 placeholder-slate-500"></textarea>
         </div>
 
         <div>
@@ -111,10 +108,46 @@
           </select>
         </div>
 
+        <div>
+          <label class="block text-sm font-medium text-slate-300 mb-1">Foto ou Print do Erro (Opcional)</label>
+          <input type="file" id="arquivoAnexo" accept="image/*" class="w-full text-xs text-slate-300 file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-indigo-800 file:text-white hover:file:bg-indigo-700 bg-indigo-900/30 border border-indigo-700/60 rounded-lg p-1.5">
+          <p id="previewAnexoForm" class="text-xs text-emerald-400 mt-1 hidden"></p>
+        </div>
+
         <div class="flex justify-end gap-3 pt-4 border-t border-indigo-900">
           <button type="button" id="btnCancelar" class="px-4 py-2 text-slate-300 hover:bg-indigo-900/50 rounded-lg">Cancelar</button>
           <button type="submit" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium shadow">Salvar Chamado</button>
         </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal Chat do Usuário -->
+  <div id="modalChat" class="fixed inset-0 bg-black/80 hidden items-center justify-center p-4 backdrop-blur-sm z-50">
+    <div class="bg-indigo-950 border border-indigo-800 rounded-2xl shadow-2xl w-full max-w-2xl flex flex-col max-h-[85vh]">
+      <div class="bg-indigo-900/80 px-6 py-4 flex justify-between items-center text-white border-b border-indigo-800 rounded-t-2xl">
+        <div>
+          <h3 class="font-bold text-base">💬 Chat do Chamado #<span id="chatIdSpan"></span></h3>
+          <p class="text-xs text-slate-300">Converse com o suporte técnico ou envie prints (Ctrl+V)</p>
+        </div>
+        <button id="btnFecharChat" type="button" class="text-slate-400 hover:text-white text-xl px-2">✕</button>
+      </div>
+
+      <div id="chatMensagensContainer" class="p-4 overflow-y-auto flex-1 space-y-3 bg-[#0c0a1d]/70">
+        <p class="text-center text-slate-500 text-xs">Carregando mensagens...</p>
+      </div>
+
+      <form id="formEnviarMensagem" class="p-4 border-t border-indigo-800 bg-indigo-950 rounded-b-2xl space-y-2">
+        <input type="hidden" id="chatChamadoId">
+        <div class="flex gap-2 items-center">
+          <input type="text" id="chatTextoInput" placeholder="Digite sua mensagem ou cole um print (Ctrl+V)..." class="flex-1 px-3 py-2 bg-indigo-900/40 border border-indigo-700/60 text-white text-sm rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+          <label class="cursor-pointer px-3 py-2 bg-indigo-900/70 hover:bg-indigo-800 border border-indigo-700/60 rounded-lg text-sm flex items-center justify-center" title="Anexar foto ou print">
+            📎
+            <input type="file" id="chatAnexoInput" accept="image/*" class="hidden">
+          </label>
+          <button type="submit" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition">Enviar</button>
+        </div>
+        <p id="chatAnexoStatus" class="text-xs text-emerald-400 hidden"></p>
       </form>
     </div>
   </div>
